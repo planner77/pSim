@@ -26,6 +26,7 @@ interface SceneProps {
   deceleration: number
   distance: number
   isSimulating: boolean
+  isPaused: boolean
   onObjectSelect: (objectData: ObjectData | null) => void
   onSimulationComplete?: () => void
   onSimulationUpdate?: (time: number, distance: number, speed: number) => void
@@ -108,6 +109,7 @@ export default function Scene({
   deceleration,
   distance,
   isSimulating,
+  isPaused,
   onObjectSelect,
   onSimulationComplete,
   onSimulationUpdate
@@ -171,7 +173,8 @@ export default function Scene({
     }
     
     // 시뮬레이션 시작 -> 중지 (리셋)
-    if (prevIsSimulating && !isSimulating) {
+    // isSimulating이 false가 되고 isPaused가 false일 때만 리셋 수행
+    if (prevIsSimulating && !isSimulating && !isPaused) {
       // 시뮬레이션 정보 초기화
       simulationStartTime.current = null;
       initialCartPosition.current = null;
@@ -187,7 +190,7 @@ export default function Scene({
         // 리셋 후 상태 플래그 설정
         setResetJustApplied(true);
         
-        // 카메라 위치 초기화
+        // 재설정(Reset) 버튼 클릭 시에만 카메라 위치 초기화
         camera.position.copy(initialCameraPosition.current);
         
         // 저장된 카메라 관련 데이터 초기화
@@ -210,7 +213,45 @@ export default function Scene({
     }
     
     setPrevIsSimulating(isSimulating);
-  }, [isSimulating]);
+  }, [isSimulating, isPaused]);
+  
+  // isPaused 상태 변화 감지
+  useEffect(() => {
+    // 시뮬레이션이 일시정지된 경우
+    if (isPaused) {
+      // 물리 엔진 비활성화
+      setPhysicsEnabled(false);
+      // 카메라 위치는 변경하지 않음 (현재 위치 그대로 유지)
+    } else if (isSimulating) {
+      // 시뮬레이션 중이고 일시정지가 해제된 경우
+      
+      // 일시정지 해제 시 (정지 -> 시작) 카메라 관련 데이터가 없으면 다시 설정
+      if (cartRef.current && !simulationStartCameraPosition.current) {
+        // 수레의 현재 위치 저장
+        const cartPosition = cartRef.current.translation();
+        simulationStartCartPosition.current = new Vector3(cartPosition.x, cartPosition.y, cartPosition.z);
+        
+        // 현재 카메라 위치 저장
+        simulationStartCameraPosition.current = camera.position.clone();
+        
+        // 카메라와 수레 사이의 오프셋 계산
+        cameraOffset.current = new Vector3(
+          camera.position.x - cartPosition.x,
+          camera.position.y - cartPosition.y,
+          camera.position.z - cartPosition.z
+        );
+        
+        // 현재 카메라가 바라보는 방향 저장
+        const direction = new Vector3(0, 0, -1);
+        direction.applyQuaternion(camera.quaternion);
+        direction.normalize();
+        simulationStartCameraDirection.current = direction.clone();
+      }
+      
+      // 물리 엔진 다시 활성화
+      setPhysicsEnabled(true);
+    }
+  }, [isPaused, isSimulating]);
   
   // 컴포넌트 언마운트 시 타이머 정리
   useEffect(() => {
@@ -334,8 +375,8 @@ export default function Scene({
   gl.domElement.addEventListener('click', handleBackgroundClick)
   
   useFrame((state, delta) => {
-    // 물리 엔진이 비활성화되었거나 시뮬레이션이 아닌 경우 물리 계산 스킵
-    if (!physicsEnabled || !isSimulating) {
+    // 물리 엔진이 비활성화되었거나 시뮬레이션이 아니거나 일시정지된 경우 물리 계산 스킵
+    if (!physicsEnabled || !isSimulating || isPaused) {
       return;
     }
     
@@ -345,7 +386,7 @@ export default function Scene({
       const cartPosition = cartRef.current.translation();
       
       // 카메라 위치 업데이트 - 수레를 따라가도록 설정
-      if (isSimulating && simulationStartCameraPosition.current && 
+      if (isSimulating && !isPaused && simulationStartCameraPosition.current && 
           cameraOffset.current && simulationStartCameraDirection.current) {
         
         // 이전 위치에서 새 위치로 부드럽게 이동하기 위한 보간 계수
@@ -507,7 +548,7 @@ export default function Scene({
     }
     
     // 시뮬레이션 중일 때만 정보 업데이트
-    if (isSimulating && cartRef.current && onSimulationUpdate && simulationStartTime.current && initialCartPosition.current) {
+    if (isSimulating && !isPaused && cartRef.current && onSimulationUpdate && simulationStartTime.current && initialCartPosition.current) {
       // 경과 시간 계산
       const currentTime = Date.now() / 1000; // 초 단위로 변환
       const elapsedTime = currentTime - simulationStartTime.current;

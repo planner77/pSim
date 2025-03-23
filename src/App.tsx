@@ -55,6 +55,7 @@ function App() {
   const [deceleration, setDeceleration] = useState(3)
   const [distance, setDistance] = useState(100)
   const [isSimulating, setIsSimulating] = useState(false)
+  const [isPaused, setIsPaused] = useState(false)
   const [selectedObject, setSelectedObject] = useState<ObjectData | null>(null)
   const [activeTab, setActiveTab] = useState<number>(0)
   
@@ -69,10 +70,18 @@ function App() {
     setSimulationDistance(0)
     setSimulationSpeed(0)
     setIsSimulating(true)
+    setIsPaused(false)
+  }
+
+  const handleStop = () => {
+    setIsPaused(true)
+    // isSimulating은 false로 설정하면 안 됩니다 - 주석 처리
+    // setIsSimulating(false)
   }
 
   const handleReset = () => {
     setIsSimulating(false)
+    setIsPaused(false)
     setSelectedObject(null)
     // 시뮬레이션 정보 초기화
     setSimulationTime(0)
@@ -132,12 +141,12 @@ function App() {
       <VStack h="100vh" p={4} gap={4}>
         <Flex w="100%" justify="space-between" align="center" mb={2}>
           <Heading size="md">물리 시뮬레이션</Heading>
-          <HStack gap={6}>
+          <HStack gap={4}>
             <Button 
               size="lg" 
               colorScheme="green" 
               onClick={handleStart} 
-              disabled={isSimulating}
+              disabled={isSimulating && !isPaused}
               fontSize="xl"
               fontWeight="bold"
               py={6}
@@ -154,9 +163,28 @@ function App() {
             </Button>
             <Button 
               size="lg" 
+              colorScheme="yellow" 
+              onClick={handleStop} 
+              disabled={!isSimulating}
+              fontSize="xl"
+              fontWeight="bold"
+              py={6}
+              px={8}
+              borderRadius="lg"
+              boxShadow="0 4px 6px rgba(0, 0, 0, 0.1)"
+              _hover={{ transform: "translateY(-2px)", boxShadow: "0 6px 8px rgba(0, 0, 0, 0.15)" }}
+              _active={{ transform: "translateY(0)", boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)" }}
+              transition="all 0.2s"
+              bg="yellow.500"
+              color="white"
+            >
+              <Box as="span" fontSize="2xl" mr={2}>⏸</Box> 정지
+            </Button>
+            <Button 
+              size="lg" 
               colorScheme="red" 
               onClick={handleReset} 
-              disabled={!isSimulating}
+              disabled={!isSimulating && !isPaused}
               fontSize="xl"
               fontWeight="bold"
               py={6}
@@ -183,7 +211,7 @@ function App() {
             borderRadius="md" 
             overflow="hidden"
             border="3px solid"
-            borderColor={isSimulating ? "green.400" : "blue.400"}
+            borderColor={isSimulating ? "green.400" : isPaused ? "yellow.400" : "blue.400"}
             boxShadow="0 4px 12px rgba(0, 0, 0, 0.15)"
             position="relative"
           >
@@ -192,7 +220,7 @@ function App() {
               position="absolute" 
               top={4} 
               right={4} 
-              bg={isSimulating ? "green.500" : "blue.500"} 
+              bg={isSimulating ? "green.500" : isPaused ? "yellow.500" : "blue.500"} 
               color="white" 
               px={3} 
               py={2} 
@@ -201,7 +229,7 @@ function App() {
               zIndex={10}
               boxShadow="0 2px 4px rgba(0, 0, 0, 0.2)"
             >
-              {isSimulating ? "시뮬레이션 진행 중" : "준비 완료"}
+              {isSimulating ? "시뮬레이션 진행 중" : isPaused ? "시뮬레이션 일시 정지" : "준비 완료"}
             </Box>
             <Box
               id="simulation-info"
@@ -219,9 +247,9 @@ function App() {
               opacity={0.9}
             >
               <VStack align="flex-start" gap={1}>
-                <Text fontSize="sm">진행 시간: {simulationTime.toFixed(1)}초</Text>
-                <Text fontSize="sm">이동 거리: {simulationDistance.toFixed(1)}m</Text>
-                <Text fontSize="sm">현재 속도: {simulationSpeed.toFixed(1)}m/s</Text>
+                <Text fontSize="sm">진행 시간: {isSimulating || isPaused ? simulationTime.toFixed(1) : "0.0"}초</Text>
+                <Text fontSize="sm">이동 거리: {isSimulating || isPaused ? simulationDistance.toFixed(1) : "0.0"}m</Text>
+                <Text fontSize="sm">현재 속도: {isSimulating || isPaused ? simulationSpeed.toFixed(1) : "0.0"}m/s</Text>
               </VStack>
             </Box>
             <Canvas shadows camera={{ position: [10, 10, 10], fov: 50 }}>
@@ -236,6 +264,7 @@ function App() {
                   deceleration={deceleration}
                   distance={distance}
                   isSimulating={isSimulating}
+                  isPaused={isPaused}
                   onObjectSelect={handleObjectSelect}
                   onSimulationComplete={handleSimulationComplete}
                   onSimulationUpdate={handleSimulationUpdate}
@@ -259,6 +288,7 @@ function App() {
                   fontSize="lg"
                   fontWeight="bold"
                   color={activeTab === 0 ? "white" : "teal.700"}
+                  bg={activeTab === 0 ? "teal.600" : "transparent"}
                   _hover={{ 
                     bg: activeTab === 0 ? "teal.600" : "teal.50",
                     color: activeTab === 0 ? "white" : "teal.800"
@@ -268,27 +298,9 @@ function App() {
                   mb={1}
                   boxShadow={activeTab === 0 ? "md" : "none"}
                 >
-                  <Box
-                    position="absolute"
-                    top="-10px"
-                    left="50%"
-                    transform="translateX(-50%)"
-                    bg="teal.600"
-                    color="white"
-                    px={3}
-                    py={1}
-                    borderRadius="md"
-                    fontWeight="bold"
-                    opacity={1}
-                    visibility="visible"
-                    transition="all 0.2s"
-                    boxShadow="0 2px 5px rgba(0, 0, 0, 0.2)"
-                    _groupHover={{ opacity: 1, visibility: "visible" }}
-                    zIndex={1}
-                  >
-                    시뮬레이션 설정
-                  </Box>
-                  <Icon as={FiSliders} boxSize={5} />
+                  <VStack gap={2}>
+                    <Text fontSize="lg">시뮬레이션 설정</Text>
+                  </VStack>
                 </Button>
                 <Button
                   flex="1"
@@ -301,6 +313,7 @@ function App() {
                   fontWeight="bold"
                   position="relative"
                   color={activeTab === 1 ? "white" : "teal.700"}
+                  bg={activeTab === 1 ? "teal.600" : "transparent"}
                   _hover={{ 
                     bg: activeTab === 1 ? "teal.600" : "teal.50",
                     color: activeTab === 1 ? "white" : "teal.800"
@@ -309,27 +322,16 @@ function App() {
                   mb={1}
                   boxShadow={activeTab === 1 ? "md" : "none"}
                 >
-                  <Box
-                    position="absolute"
-                    top="-10px"
-                    left="50%"
-                    transform="translateX(-50%)"
-                    bg="teal.600"
-                    color="white"
-                    px={3}
-                    py={1}
-                    borderRadius="md"
-                    fontWeight="bold"
-                    opacity={1}
-                    visibility="visible"
-                    transition="all 0.2s"
-                    boxShadow="0 2px 5px rgba(0, 0, 0, 0.2)"
-                    _groupHover={{ opacity: 1, visibility: "visible" }}
-                    zIndex={1}
-                  >
-                    객체 정보
-                  </Box>
-                  <Icon as={FiPackage} boxSize={5} />
+                  <VStack gap={2}>
+                    <Text fontSize="lg">객체 정보</Text>
+                    {selectedObject && (
+                      <VStack gap={1}>
+                        <Text fontSize="sm">유형: {selectedObject.type === 'cart' ? '수레' : '상자'}</Text>
+                        <Text fontSize="sm">위치: {selectedObject.position[0].toFixed(1)}, {selectedObject.position[1].toFixed(1)}</Text>
+                        <Text fontSize="sm">속도: {selectedObject.velocity[0].toFixed(1)}m/s</Text>
+                      </VStack>
+                    )}
+                  </VStack>
                   {selectedObject && (
                     <Box
                       position="absolute"
